@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import App from './App.jsx'
+import { Web3Provider } from './context/Web3Context.jsx'
 import './App.css'
 
 // Error boundary component
@@ -92,10 +93,12 @@ const toastOptions = {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
-        <App />
-        <Toaster toastOptions={toastOptions} />
-      </BrowserRouter>
+      <Web3Provider>
+        <BrowserRouter>
+          <App />
+          <Toaster toastOptions={toastOptions} />
+        </BrowserRouter>
+      </Web3Provider>
     </ErrorBoundary>
   </React.StrictMode>,
 )
