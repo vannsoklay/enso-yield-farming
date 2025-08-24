@@ -7,7 +7,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 
 const logger = require('./utils/logger');
-const rateLimiter = require('./middleware/rateLimiter');
+const { rateLimiter } = require('./middleware/rateLimiter');
 
 // Import routes
 const healthRoutes = require('./routes/health');
