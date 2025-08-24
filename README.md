@@ -116,13 +116,51 @@ enso-yield-farming/
 2. **Withdraw**: Send LP tokens on Gnosis → Receive EURe on Polygon  
 3. **Compound**: Automatically reinvest earnings for optimal yield
 
+## Migration to viem v2
+
+### What Changed
+
+This project has been migrated from **ethers.js v6** to **viem v2** for better performance, smaller bundle size, and modern TypeScript support.
+
+### Key Changes
+
+#### Backend Changes
+- Replaced `ethers.Contract` with viem `readContract`/`writeContract` actions
+- Updated from `ethers.formatEther`/`parseEther` to viem `formatUnits`/`parseUnits`
+- Replaced ethers providers/signers with viem public and wallet clients
+- BigInt handling instead of BigNumber for all amounts
+- Private key validation using hex pattern matching
+
+#### Frontend Changes
+- Web3Context now uses viem wallet clients with `window.ethereum`
+- Contract interactions through viem actions instead of ethers contracts
+- Balance fetching using viem's `getBalance` and `readContract`
+- Updated wallet connection to use viem's `custom` transport
+
+#### Breaking Changes
+- All numeric values are now returned as `bigint` instead of `BigNumber`
+- Contract interaction API has changed from ethers-style to viem actions
+- Wallet connection flow updated to use viem patterns
+
+### Installation
+
+The project now uses **viem v2.34.0**. Install dependencies as usual:
+
+```bash
+npm run install:all
+```
+
+### Environment Variables
+
+No changes to environment variables are required. The same configuration works with viem.
+
 ## Technology Stack
 
 ### Backend
 - **Express.js** - Web application framework
 - **Socket.io** - Real-time communication
 - **Enso SDK** - Cross-chain operations
-- **ethers.js** - Blockchain interactions
+- **viem v2** - Modern TypeScript library for Ethereum interactions
 - **Joi** - Input validation
 - **Winston** - Logging
 
@@ -130,6 +168,7 @@ enso-yield-farming/
 - **React 18** - User interface library
 - **Vite** - Build tool and development server
 - **Socket.io-client** - Real-time updates
+- **viem v2** - Ethereum wallet and contract interactions
 - **React Hooks** - State management
 - **CSS3** - Responsive styling
 

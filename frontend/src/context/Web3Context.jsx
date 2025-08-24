@@ -1,7 +1,7 @@
-// Web3Context.jsx - Enhanced Web3 integration with ethers.js + viem
+// Web3Context.jsx - Enhanced Web3 integration with viem v2
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { ethers } from 'ethers';
-import { createPublicClient, createWalletClient, http } from 'viem';
+import { createPublicClient, createWalletClient, http, custom } from 'viem';
+import { getAddress } from 'viem/utils';
 import { polygon, gnosis } from 'viem/chains';
 
 const Web3Context = createContext();
@@ -17,9 +17,8 @@ export const useWeb3 = () => {
 export const Web3Provider = ({ children }) => {
   const [account, setAccount] = useState(null);
   const [chainId, setChainId] = useState(null);
-  const [provider, setProvider] = useState(null);
-  const [signer, setSigner] = useState(null);
-  const [clients, setClients] = useState({});
+  const [walletClient, setWalletClient] = useState(null);
+  const [publicClients, setPublicClients] = useState({});
   const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
@@ -43,8 +42,7 @@ export const Web3Provider = ({ children }) => {
     if (accounts.length === 0) {
       // User disconnected
       setAccount(null);
-      setProvider(null);
-      setSigner(null);
+      setWalletClient(null);
     } else {
       setAccount(accounts[0]);
       initializeWeb3();
@@ -59,22 +57,27 @@ export const Web3Provider = ({ children }) => {
   const initializeWeb3 = async () => {
     if (typeof window.ethereum !== 'undefined') {
       try {
-        // Initialize ethers provider
-        const web3Provider = new ethers.BrowserProvider(window.ethereum);
-        const accounts = await web3Provider.listAccounts();
+        // Get current accounts
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         
         if (accounts.length > 0) {
-          const web3Signer = await web3Provider.getSigner();
-          const address = await web3Signer.getAddress();
-          const network = await web3Provider.getNetwork();
-
-          setProvider(web3Provider);
-          setSigner(web3Signer);
+          const address = getAddress(accounts[0]);
           setAccount(address);
-          setChainId(Number(network.chainId));
+
+          // Get current chain ID
+          const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+          const currentChainId = parseInt(chainIdHex, 16);
+          setChainId(currentChainId);
+
+          // Create wallet client with current account
+          const walletClient = createWalletClient({
+            transport: custom(window.ethereum),
+            chain: currentChainId === 137 ? polygon : gnosis
+          });
+          setWalletClient(walletClient);
         }
 
-        // Initialize viem clients
+        // Initialize public clients for both chains
         const polygonClient = createPublicClient({
           chain: polygon,
           transport: http()
@@ -85,7 +88,7 @@ export const Web3Provider = ({ children }) => {
           transport: http()
         });
 
-        setClients({
+        setPublicClients({
           polygon: polygonClient,
           gnosis: gnosisClient
         });
@@ -175,22 +178,39 @@ export const Web3Provider = ({ children }) => {
 
   const disconnect = async () => {
     setAccount(null);
-    setProvider(null);
-    setSigner(null);
+    setWalletClient(null);
     setChainId(null);
+  };
+
+  const getNetwork = () => {
+    return chainId === 137 ? 'polygon' : chainId === 100 ? 'gnosis' : 'unknown';
+  };
+
+  const getAddress = () => {
+    return account;
+  };
+
+  const switchChain = async (targetChainId) => {
+    if (targetChainId === 137) {
+      await switchToPolygon();
+    } else if (targetChainId === 100) {
+      await switchToGnosis();
+    }
   };
 
   const value = {
     account,
     chainId,
-    provider,
-    signer,
-    clients,
+    walletClient,
+    publicClients,
     isConnecting,
     connectWallet,
     disconnect,
     switchToPolygon,
     switchToGnosis,
+    switchChain,
+    getNetwork,
+    getAddress,
     isConnected: !!account,
     isPolygon: chainId === 137,
     isGnosis: chainId === 100

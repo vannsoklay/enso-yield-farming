@@ -1,44 +1,46 @@
-// useContract.js - Custom hook for contract interactions with ethers.js + viem
-import { useEffect, useState } from 'react';
-import { ethers } from 'ethers';
+// useContract.js - Custom hook for contract interactions with viem v2
+import { useCallback } from 'react';
+import { readContract, writeContract } from 'viem/actions';
 import { useWeb3 } from '../context/Web3Context';
 
 export const useContract = (address, abi, chainId) => {
-  const { provider, signer, clients, chainId: currentChainId } = useWeb3();
-  const [contract, setContract] = useState(null);
-  const [readOnlyContract, setReadOnlyContract] = useState(null);
-  const [isCorrectChain, setIsCorrectChain] = useState(false);
+  const { walletClient, publicClients, chainId: currentChainId } = useWeb3();
+  
+  const isCorrectChain = !chainId || currentChainId === chainId;
+  const client = chainId === 137 ? publicClients.polygon : publicClients.gnosis;
 
-  useEffect(() => {
-    if (provider && signer && address && abi) {
-      try {
-        // Create contract instance with signer for write operations
-        const contractWithSigner = new ethers.Contract(address, abi, signer);
-        setContract(contractWithSigner);
-
-        // Create read-only contract instance
-        const readContract = new ethers.Contract(address, abi, provider);
-        setReadOnlyContract(readContract);
-
-        // Check if we're on the correct chain
-        setIsCorrectChain(!chainId || currentChainId === chainId);
-      } catch (error) {
-        console.error('Error creating contract:', error);
-        setContract(null);
-        setReadOnlyContract(null);
-        setIsCorrectChain(false);
-      }
-    } else {
-      setContract(null);
-      setReadOnlyContract(null);
-      setIsCorrectChain(false);
+  const read = useCallback(async (functionName, args = []) => {
+    if (!client || !address || !abi || !isCorrectChain) {
+      throw new Error('Contract read not available');
     }
-  }, [provider, signer, address, abi, chainId, currentChainId]);
+
+    return await readContract(client, {
+      address,
+      abi,
+      functionName,
+      args
+    });
+  }, [client, address, abi, isCorrectChain]);
+
+  const write = useCallback(async (functionName, args = [], options = {}) => {
+    if (!walletClient || !address || !abi || !isCorrectChain) {
+      throw new Error('Contract write not available');
+    }
+
+    return await writeContract(walletClient, {
+      address,
+      abi,
+      functionName,
+      args,
+      ...options
+    });
+  }, [walletClient, address, abi, isCorrectChain]);
 
   return { 
-    contract: isCorrectChain ? contract : null, 
-    readOnlyContract: isCorrectChain ? readOnlyContract : null,
-    isCorrectChain
+    read,
+    write,
+    isCorrectChain,
+    client: isCorrectChain ? client : null
   };
 };
 

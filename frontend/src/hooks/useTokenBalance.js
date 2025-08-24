@@ -1,16 +1,17 @@
-// useTokenBalance.js - Enhanced balance hook with viem integration
+// useTokenBalance.js - Enhanced balance hook with viem v2 integration
 import { useEffect, useState, useCallback } from 'react';
-import { ethers } from 'ethers';
+import { readContract } from 'viem/actions';
+import { formatUnits } from 'viem';
 import { useWeb3 } from '../context/Web3Context';
 
-export const useTokenBalance = (tokenAddress, chainId) => {
-  const { account, clients, chainId: currentChainId } = useWeb3();
+export const useTokenBalance = (tokenAddress, chainId, decimals = 18) => {
+  const { account, publicClients, chainId: currentChainId } = useWeb3();
   const [balance, setBalance] = useState('0');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchBalance = useCallback(async () => {
-    if (!account || !tokenAddress || !clients || (chainId && currentChainId !== chainId)) {
+    if (!account || !tokenAddress || !publicClients || (chainId && currentChainId !== chainId)) {
       setBalance('0');
       return;
     }
@@ -19,7 +20,7 @@ export const useTokenBalance = (tokenAddress, chainId) => {
     setError(null);
     
     try {
-      const client = chainId === 137 ? clients.polygon : clients.gnosis;
+      const client = chainId === 137 ? publicClients.polygon : publicClients.gnosis;
       
       if (!client) {
         throw new Error('Client not available for the specified chain');
@@ -30,11 +31,11 @@ export const useTokenBalance = (tokenAddress, chainId) => {
         const balance = await client.getBalance({
           address: account
         });
-        setBalance(ethers.formatEther(balance.toString()));
+        setBalance(formatUnits(balance, decimals));
       } else {
         // Get ERC20 token balance using viem
         try {
-          const balance = await client.readContract({
+          const balance = await readContract(client, {
             address: tokenAddress,
             abi: [
               {
@@ -48,7 +49,7 @@ export const useTokenBalance = (tokenAddress, chainId) => {
             functionName: 'balanceOf',
             args: [account]
           });
-          setBalance(ethers.formatEther(balance.toString()));
+          setBalance(formatUnits(balance, decimals));
         } catch (contractError) {
           // Fallback: might not be a standard ERC20 token
           console.warn('Failed to read contract balance:', contractError);
@@ -62,7 +63,7 @@ export const useTokenBalance = (tokenAddress, chainId) => {
     } finally {
       setLoading(false);
     }
-  }, [account, tokenAddress, chainId, currentChainId, clients]);
+  }, [account, tokenAddress, chainId, currentChainId, publicClients, decimals]);
 
   useEffect(() => {
     fetchBalance();
