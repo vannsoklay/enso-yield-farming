@@ -1,4 +1,4 @@
-const { ethers } = require('ethers');
+const { formatUnits, parseUnits, isAddress } = require('viem');
 
 /**
  * Format wei amount to human readable format
@@ -9,7 +9,7 @@ const { ethers } = require('ethers');
  */
 const formatAmount = (amount, decimals = 18, precision = 4) => {
   try {
-    const formatted = ethers.formatUnits(amount, decimals);
+    const formatted = formatUnits(BigInt(amount), decimals);
     return parseFloat(formatted).toFixed(precision);
   } catch (error) {
     return '0.0000';
@@ -20,11 +20,11 @@ const formatAmount = (amount, decimals = 18, precision = 4) => {
  * Parse human readable amount to wei
  * @param {string} amount - Human readable amount
  * @param {number} decimals - Token decimals (default: 18)
- * @returns {BigNumber} Amount in wei
+ * @returns {bigint} Amount in wei
  */
 const parseAmount = (amount, decimals = 18) => {
   try {
-    return ethers.parseUnits(amount.toString(), decimals);
+    return parseUnits(amount.toString(), decimals);
   } catch (error) {
     throw new Error(`Invalid amount: ${amount}`);
   }
@@ -37,7 +37,7 @@ const parseAmount = (amount, decimals = 18) => {
  */
 const isValidAddress = (address) => {
   try {
-    return ethers.isAddress(address);
+    return isAddress(address);
   } catch (error) {
     return false;
   }
@@ -50,8 +50,9 @@ const isValidAddress = (address) => {
  */
 const isValidPrivateKey = (privateKey) => {
   try {
-    new ethers.Wallet(privateKey);
-    return true;
+    // Basic validation for private key format (64 hex chars with optional 0x prefix)
+    const cleanKey = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+    return /^[0-9a-fA-F]{64}$/.test(cleanKey);
   } catch (error) {
     return false;
   }

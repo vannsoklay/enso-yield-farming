@@ -1,7 +1,6 @@
-// Web3Context.jsx - Enhanced Web3 integration with ethers.js + viem
+// Web3Context.jsx - Enhanced Web3 integration with viem v2
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { ethers } from 'ethers';
-import { createPublicClient, createWalletClient, http } from 'viem';
+import { createPublicClient, createWalletClient, http, custom, formatUnits, parseUnits } from 'viem';
 import { polygon, gnosis } from 'viem/chains';
 
 const Web3Context = createContext();
@@ -17,9 +16,8 @@ export const useWeb3 = () => {
 export const Web3Provider = ({ children }) => {
   const [account, setAccount] = useState(null);
   const [chainId, setChainId] = useState(null);
-  const [provider, setProvider] = useState(null);
-  const [signer, setSigner] = useState(null);
   const [clients, setClients] = useState({});
+  const [walletClient, setWalletClient] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
@@ -43,8 +41,7 @@ export const Web3Provider = ({ children }) => {
     if (accounts.length === 0) {
       // User disconnected
       setAccount(null);
-      setProvider(null);
-      setSigner(null);
+      setWalletClient(null);
     } else {
       setAccount(accounts[0]);
       initializeWeb3();
@@ -59,22 +56,24 @@ export const Web3Provider = ({ children }) => {
   const initializeWeb3 = async () => {
     if (typeof window.ethereum !== 'undefined') {
       try {
-        // Initialize ethers provider
-        const web3Provider = new ethers.BrowserProvider(window.ethereum);
-        const accounts = await web3Provider.listAccounts();
+        // Get current accounts
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         
         if (accounts.length > 0) {
-          const web3Signer = await web3Provider.getSigner();
-          const address = await web3Signer.getAddress();
-          const network = await web3Provider.getNetwork();
+          const currentAccount = accounts[0];
+          const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
 
-          setProvider(web3Provider);
-          setSigner(web3Signer);
-          setAccount(address);
-          setChainId(Number(network.chainId));
+          setAccount(currentAccount);
+          setChainId(parseInt(currentChainId, 16));
+
+          // Create wallet client with current transport
+          const currentWalletClient = createWalletClient({
+            transport: custom(window.ethereum)
+          });
+          setWalletClient(currentWalletClient);
         }
 
-        // Initialize viem clients
+        // Initialize viem public clients
         const polygonClient = createPublicClient({
           chain: polygon,
           transport: http()
@@ -175,25 +174,37 @@ export const Web3Provider = ({ children }) => {
 
   const disconnect = async () => {
     setAccount(null);
-    setProvider(null);
-    setSigner(null);
+    setWalletClient(null);
     setChainId(null);
+  };
+
+  const getAddress = () => account;
+  
+  const switchChain = async (chainId) => {
+    if (chainId === 137) {
+      await switchToPolygon();
+    } else if (chainId === 100) {
+      await switchToGnosis();
+    }
   };
 
   const value = {
     account,
     chainId,
-    provider,
-    signer,
+    walletClient,
     clients,
     isConnecting,
     connectWallet,
     disconnect,
+    getAddress,
+    switchChain,
     switchToPolygon,
     switchToGnosis,
     isConnected: !!account,
     isPolygon: chainId === 137,
-    isGnosis: chainId === 100
+    isGnosis: chainId === 100,
+    formatUnits,
+    parseUnits
   };
 
   return (

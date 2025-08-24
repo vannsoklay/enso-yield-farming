@@ -122,7 +122,7 @@ enso-yield-farming/
 - **Express.js** - Web application framework
 - **Socket.io** - Real-time communication
 - **Enso SDK** - Cross-chain operations
-- **ethers.js** - Blockchain interactions
+- **viem v2** - Modern blockchain interactions library
 - **Joi** - Input validation
 - **Winston** - Logging
 
@@ -130,6 +130,7 @@ enso-yield-farming/
 - **React 18** - User interface library
 - **Vite** - Build tool and development server
 - **Socket.io-client** - Real-time updates
+- **viem v2** - Modern Web3 client library  
 - **React Hooks** - State management
 - **CSS3** - Responsive styling
 
@@ -137,6 +138,26 @@ enso-yield-farming/
 - **Docker** - Containerization
 - **Nginx** - Reverse proxy and load balancing
 - **Redis** - Caching and session storage
+
+## Migration to viem v2
+
+### Breaking Changes
+- **BigNumber replaced with native bigint**: All numeric values for token amounts, gas prices, and balances now use JavaScript's native `BigInt` type instead of ethers.js `BigNumber`
+- **Provider/Signer architecture removed**: Replaced ethers.js BrowserProvider and Signer pattern with viem's createWalletClient and createPublicClient
+- **Contract interaction changes**: Direct contract instances replaced with functional `readContract`/`writeContract` calls
+- **Utility function changes**: `parseEther`/`formatEther` replaced with `parseUnits`/`formatUnits`
+
+### Manual Migration Steps
+1. **Environment Variables**: No changes required to existing environment variables
+2. **API Compatibility**: Backend API endpoints remain unchanged - only internal implementation migrated
+3. **Frontend Integration**: Web3 context now provides viem clients instead of ethers providers
+4. **Testing**: Run `npm run lint` and `npm run test` to verify migration
+
+### Migration Benefits
+- **Better Performance**: viem v2 provides faster and more efficient blockchain interactions
+- **Modern APIs**: Type-safe, tree-shakeable, and more intuitive developer experience  
+- **Reduced Bundle Size**: Smaller client-side bundles due to viem's modular architecture
+- **Native BigInt**: Leverages JavaScript's native BigInt for better performance and precision
 
 ## Contributing
 
