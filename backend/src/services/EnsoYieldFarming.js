@@ -1,5 +1,4 @@
-const { ethers } = require('ethers');
-const { createPublicClient, createWalletClient, http } = require('viem');
+const { createPublicClient, createWalletClient, http, getBalance, readContract, writeContract, estimateGas } = require('viem');
 const { polygon, gnosis } = require('viem/chains');
 const { privateKeyToAccount } = require('viem/accounts');
 const logger = require('../utils/logger');
@@ -12,18 +11,10 @@ class EnsoYieldFarming {
     this.apiKey = apiKey;
     this.privateKey = privateKey;
     
-    // Initialize ethers wallet
-    this.wallet = new ethers.Wallet(privateKey);
+    // Initialize viem account from private key
+    this.account = privateKeyToAccount(privateKey);
     
-    // Initialize ethers providers
-    this.polygonProvider = new ethers.JsonRpcProvider(getRpcUrl(137));
-    this.gnosisProvider = new ethers.JsonRpcProvider(getRpcUrl(100));
-    
-    // Connect wallet to providers
-    this.polygonWallet = this.wallet.connect(this.polygonProvider);
-    this.gnosisWallet = this.wallet.connect(this.gnosisProvider);
-    
-    // Initialize viem clients for enhanced functionality
+    // Initialize viem public clients
     this.polygonClient = createPublicClient({
       chain: polygon,
       transport: http(getRpcUrl(137))
@@ -34,16 +25,15 @@ class EnsoYieldFarming {
       transport: http(getRpcUrl(100))
     });
     
-    // Viem wallet clients
-    const account = privateKeyToAccount(privateKey);
+    // Initialize viem wallet clients
     this.polygonWalletClient = createWalletClient({
-      account,
+      account: this.account,
       chain: polygon,
       transport: http(getRpcUrl(137))
     });
     
     this.gnosisWalletClient = createWalletClient({
-      account,
+      account: this.account,
       chain: gnosis,
       transport: http(getRpcUrl(100))
     });
@@ -53,19 +43,19 @@ class EnsoYieldFarming {
     this.cacheTimeout = 30000; // 30 seconds
     
     logger.info('EnsoYieldFarming service initialized', {
-      walletAddress: this.wallet.address,
+      walletAddress: this.account.address,
       polygonRpc: getRpcUrl(137),
       gnosisRpc: getRpcUrl(100)
     });
   }
 
   /**
-   * Get balances from both chains using enhanced ethers.js + viem integration
+   * Get balances from both chains using viem integration
    * @param {string} userAddress - User's wallet address
    * @returns {Object} Balances from both chains
    */
   async getBalances(userAddress = null) {
-    const address = userAddress || this.wallet.address;
+    const address = userAddress || this.account.address;
     const cacheKey = `balances_${address}`;
     
     // Check cache first
@@ -188,19 +178,31 @@ class EnsoYieldFarming {
    * @param {string} address - Wallet address
    * @param {string} tokenAddress - Token contract address
    * @param {number} chainId - Chain ID
-   * @returns {BigNumber} Token balance
+   * @returns {bigint} Token balance
    */
   async getTokenBalance(address, tokenAddress, chainId) {
     try {
-      const provider = chainId === 137 ? this.polygonProvider : this.gnosisProvider;
+      const client = chainId === 137 ? this.polygonClient : this.gnosisClient;
       
       // ERC20 ABI for balanceOf function
       const erc20Abi = [
-        'function balanceOf(address owner) view returns (uint256)'
+        {
+          name: 'balanceOf',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [{ name: 'owner', type: 'address' }],
+          outputs: [{ type: 'uint256' }]
+        }
       ];
       
-      const contract = new ethers.Contract(tokenAddress, erc20Abi, provider);
-      return await contract.balanceOf(address);
+      const balance = await readContract(client, {
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [address]
+      });
+      
+      return balance;
     } catch (error) {
       logger.error('Failed to get token balance', {
         error: error.message,
@@ -208,7 +210,7 @@ class EnsoYieldFarming {
         tokenAddress,
         chainId
       });
-      return ethers.parseUnits('0', 18);
+      return 0n;
     }
   }
 
@@ -221,7 +223,7 @@ class EnsoYieldFarming {
    */
   async depositWithMonitoring(amount, slippage = 0.5, userAddress = null) {
     const txId = generateTxId();
-    const address = userAddress || this.wallet.address;
+    const address = userAddress || this.account.address;
     
     logger.info('Starting deposit with monitoring', {
       txId,
@@ -267,7 +269,7 @@ class EnsoYieldFarming {
    */
   async withdrawWithMonitoring(amount, slippage = 0.5, userAddress = null) {
     const txId = generateTxId();
-    const address = userAddress || this.wallet.address;
+    const address = userAddress || this.account.address;
     
     logger.info('Starting withdraw with monitoring', {
       txId,
@@ -310,7 +312,7 @@ class EnsoYieldFarming {
    * @returns {Object} Compound result or null if no earnings
    */
   async autoCompound(userAddress = null) {
-    const address = userAddress || this.wallet.address;
+    const address = userAddress || this.account.address;
     
     try {
       const earnings = await this.getEarnings(address);
@@ -491,17 +493,19 @@ class EnsoYieldFarming {
       };
 
       const estimatedGas = baseGas[operation] || 100000;
-      const gasPrice = await this.polygonProvider.getFeeData();
+      const gasPrice = await this.polygonClient.getGasPrice();
       
-      const estimatedCost = ethers.formatEther(
-        BigInt(estimatedGas) * gasPrice.gasPrice
+      const estimatedCost = formatAmount(
+        (BigInt(estimatedGas) * gasPrice).toString(),
+        18,
+        6
       );
 
       return {
         operation,
         amount,
         estimatedGas,
-        gasPrice: gasPrice.gasPrice.toString(),
+        gasPrice: gasPrice.toString(),
         estimatedCost,
         currency: 'MATIC',
         timestamp: new Date().toISOString()
@@ -526,27 +530,34 @@ class EnsoYieldFarming {
     try {
       // Get native MATIC balance using viem
       const maticBalance = await this.polygonClient.getBalance({
-        address: this.polygonWallet.address
+        address: this.account.address
       });
       
-      // Get EURe token balance using ethers.js contract
-      const eureContract = new ethers.Contract(
-        EURE_TOKEN,
-        ['function balanceOf(address) view returns (uint256)'],
-        this.polygonProvider
-      );
-      
-      const eureBalance = await eureContract.balanceOf(this.polygonWallet.address);
+      // Get EURe token balance using viem readContract
+      const eureBalance = await readContract(this.polygonClient, {
+        address: EURE_TOKEN,
+        abi: [
+          {
+            name: 'balanceOf',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'account', type: 'address' }],
+            outputs: [{ type: 'uint256' }]
+          }
+        ],
+        functionName: 'balanceOf',
+        args: [this.account.address]
+      });
       
       return {
-        matic: ethers.formatEther(maticBalance.toString()),
-        eure: ethers.formatEther(eureBalance.toString()),
-        address: this.polygonWallet.address
+        matic: formatAmount(maticBalance.toString(), 18, 4),
+        eure: formatAmount(eureBalance.toString(), 18, 4),
+        address: this.account.address
       };
     } catch (error) {
       logger.error('Failed to get Polygon balance with viem', {
         error: error.message,
-        address: this.polygonWallet.address
+        address: this.account.address
       });
       throw error;
     }
@@ -562,22 +573,29 @@ class EnsoYieldFarming {
     try {
       // Get native xDAI balance using viem
       const xdaiBalance = await this.gnosisClient.getBalance({
-        address: this.gnosisWallet.address
+        address: this.account.address
       });
       
-      // Get LP token balance using ethers.js contract
-      const lpContract = new ethers.Contract(
-        LP_TOKEN,
-        ['function balanceOf(address) view returns (uint256)'],
-        this.gnosisProvider
-      );
-      
-      const lpBalance = await lpContract.balanceOf(this.gnosisWallet.address);
+      // Get LP token balance using viem readContract
+      const lpBalance = await readContract(this.gnosisClient, {
+        address: LP_TOKEN,
+        abi: [
+          {
+            name: 'balanceOf',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'account', type: 'address' }],
+            outputs: [{ type: 'uint256' }]
+          }
+        ],
+        functionName: 'balanceOf',
+        args: [this.account.address]
+      });
       
       return {
-        xdai: ethers.formatEther(xdaiBalance.toString()),
-        lp: ethers.formatEther(lpBalance.toString()),
-        address: this.gnosisWallet.address
+        xdai: formatAmount(xdaiBalance.toString(), 18, 4),
+        lp: formatAmount(lpBalance.toString(), 18, 4),
+        address: this.account.address
       };
     } catch (error) {
       logger.error('Failed to get Gnosis balance with viem', {
@@ -589,38 +607,59 @@ class EnsoYieldFarming {
   }
 
   /**
-   * Deposit EURe for LP tokens using ethers.js + viem integration
+   * Deposit EURe for LP tokens using viem integration
    * @param {string} amount - Amount to deposit
    * @returns {Object} Transaction result
    */
   async depositWithEthersViem(amount) {
     const EURE_TOKEN = '0x18ec0A6E18E5bc3784fDd3a3634b31245ab704F6';
+    const ENSO_ROUTER = process.env.ENSO_ROUTER_ADDRESS || '0x1234567890123456789012345678901234567890';
     
     try {
-      // 1. Approve EURe token spending using ethers.js
-      const eureContract = new ethers.Contract(
-        EURE_TOKEN,
-        [
-          'function approve(address spender, uint256 amount) returns (bool)',
-          'function allowance(address owner, address spender) view returns (uint256)'
-        ],
-        this.polygonWallet
-      );
+      // 1. Approve EURe token spending using viem
+      const erc20Abi = [
+        {
+          name: 'approve',
+          type: 'function',
+          stateMutability: 'nonpayable',
+          inputs: [
+            { name: 'spender', type: 'address' },
+            { name: 'amount', type: 'uint256' }
+          ],
+          outputs: [{ type: 'bool' }]
+        },
+        {
+          name: 'allowance',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [
+            { name: 'owner', type: 'address' },
+            { name: 'spender', type: 'address' }
+          ],
+          outputs: [{ type: 'uint256' }]
+        }
+      ];
       
-      const amountWei = ethers.parseEther(amount.toString());
+      const amountWei = parseAmount(amount.toString(), 18);
       
       // Check current allowance
-      const currentAllowance = await eureContract.allowance(
-        this.polygonWallet.address,
-        process.env.ENSO_ROUTER_ADDRESS || '0x1234567890123456789012345678901234567890'
-      );
+      const currentAllowance = await readContract(this.polygonClient, {
+        address: EURE_TOKEN,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [this.account.address, ENSO_ROUTER]
+      });
       
       if (currentAllowance < amountWei) {
-        const approveTx = await eureContract.approve(
-          process.env.ENSO_ROUTER_ADDRESS || '0x1234567890123456789012345678901234567890',
-          amountWei
-        );
-        await approveTx.wait();
+        const approveTxHash = await writeContract(this.polygonWalletClient, {
+          address: EURE_TOKEN,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [ENSO_ROUTER, amountWei]
+        });
+        
+        // Wait for approval transaction to be mined
+        await this.polygonClient.waitForTransactionReceipt({ hash: approveTxHash });
       }
       
       // 2. Simulate Enso deposit transaction (placeholder for actual Enso SDK integration)
@@ -643,44 +682,65 @@ class EnsoYieldFarming {
       return this.monitorCrossChainTransactionViem(txHash, 'deposit');
       
     } catch (error) {
-      logger.error('Deposit with ethers+viem failed:', error);
+      logger.error('Deposit with viem failed:', error);
       throw new Error(`Deposit failed: ${error.message}`);
     }
   }
 
   /**
-   * Withdraw LP tokens for EURe using ethers.js + viem integration
+   * Withdraw LP tokens for EURe using viem integration
    * @param {string} amount - Amount to withdraw
    * @returns {Object} Transaction result
    */
   async withdrawWithEthersViem(amount) {
     const LP_TOKEN = '0xedbc7449a9b594ca4e053d9737ec5dc4cbccbfb2';
+    const ENSO_ROUTER = process.env.ENSO_ROUTER_ADDRESS || '0x1234567890123456789012345678901234567890';
     
     try {
-      // 1. Approve LP token spending using ethers.js
-      const lpContract = new ethers.Contract(
-        LP_TOKEN,
-        [
-          'function approve(address spender, uint256 amount) returns (bool)',
-          'function allowance(address owner, address spender) view returns (uint256)'
-        ],
-        this.gnosisWallet
-      );
+      // 1. Approve LP token spending using viem
+      const erc20Abi = [
+        {
+          name: 'approve',
+          type: 'function',
+          stateMutability: 'nonpayable',
+          inputs: [
+            { name: 'spender', type: 'address' },
+            { name: 'amount', type: 'uint256' }
+          ],
+          outputs: [{ type: 'bool' }]
+        },
+        {
+          name: 'allowance',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [
+            { name: 'owner', type: 'address' },
+            { name: 'spender', type: 'address' }
+          ],
+          outputs: [{ type: 'uint256' }]
+        }
+      ];
       
-      const amountWei = ethers.parseEther(amount.toString());
+      const amountWei = parseAmount(amount.toString(), 18);
       
       // Check current allowance
-      const currentAllowance = await lpContract.allowance(
-        this.gnosisWallet.address,
-        process.env.ENSO_ROUTER_ADDRESS || '0x1234567890123456789012345678901234567890'
-      );
+      const currentAllowance = await readContract(this.gnosisClient, {
+        address: LP_TOKEN,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [this.account.address, ENSO_ROUTER]
+      });
       
       if (currentAllowance < amountWei) {
-        const approveTx = await lpContract.approve(
-          process.env.ENSO_ROUTER_ADDRESS || '0x1234567890123456789012345678901234567890',
-          amountWei
-        );
-        await approveTx.wait();
+        const approveTxHash = await writeContract(this.gnosisWalletClient, {
+          address: LP_TOKEN,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [ENSO_ROUTER, amountWei]
+        });
+        
+        // Wait for approval transaction to be mined
+        await this.gnosisClient.waitForTransactionReceipt({ hash: approveTxHash });
       }
       
       // 2. Simulate Enso withdrawal transaction (placeholder for actual Enso SDK integration)
@@ -703,7 +763,7 @@ class EnsoYieldFarming {
       return this.monitorCrossChainTransactionViem(txHash, 'withdraw');
       
     } catch (error) {
-      logger.error('Withdrawal with ethers+viem failed:', error);
+      logger.error('Withdrawal with viem failed:', error);
       throw new Error(`Withdrawal failed: ${error.message}`);
     }
   }
@@ -786,7 +846,7 @@ class EnsoYieldFarming {
       return {
         gasLimit: gasEstimate.toString(),
         gasPrice: gasPrice.toString(),
-        estimatedCost: ethers.formatEther((gasEstimate * gasPrice).toString()),
+        estimatedCost: formatAmount((gasEstimate * gasPrice).toString(), 18, 6),
         operation,
         amount,
         timestamp: new Date().toISOString()
