@@ -1,0 +1,377 @@
+/* Header Styles */
+.header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
+}
+
+/* Brand Section */
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.brand-logo {
+  position: relative;
+}
+
+.logo-icon {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 1.5rem;
+  position: relative;
+}
+
+.logo-symbol {
+  color: var(--color-primary);
+  transition: all var(--transition-fast);
+}
+
+.logo-symbol--accent {
+  color: var(--color-secondary);
+}
+
+.brand-logo:hover .logo-symbol {
+  transform: scale(1.1);
+}
+
+.brand-text {
+  min-width: 0;
+}
+
+.brand-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 400;
+}
+
+/* Chain Indicators */
+.chain-indicators {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.chain-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.chain-indicator:hover {
+  background: var(--bg-hover);
+}
+
+.chain-icon {
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+.chain-indicator:first-child .chain-icon {
+  color: #8247e5; /* Polygon purple */
+}
+
+.chain-indicator:last-child .chain-icon {
+  color: #00d4aa; /* Gnosis green */
+}
+
+.chain-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.chain-connector {
+  display: flex;
+  align-items: center;
+  position: relative;
+  padding: 0 var(--spacing-xs);
+}
+
+.connector-line {
+  width: 20px;
+  height: 1px;
+  background: var(--border-secondary);
+  position: relative;
+}
+
+.connector-arrow {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-left: -2px;
+  animation: pulse-arrow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-arrow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Status Section */
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  flex-shrink: 0;
+}
+
+.status-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.status-icon {
+  flex-shrink: 0;
+}
+
+.status-icon--healthy {
+  color: var(--color-secondary);
+}
+
+.status-icon--connected {
+  color: var(--color-secondary);
+}
+
+.status-icon--disconnected {
+  color: var(--color-error);
+}
+
+.status-icon--error {
+  color: var(--color-error);
+}
+
+.status-icon--unknown {
+  color: var(--text-muted);
+}
+
+.status-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.version-badge {
+  background: var(--bg-input);
+  color: var(--text-muted);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: 0.625rem;
+  font-weight: 500;
+  font-family: monospace;
+  border: 1px solid var(--border-primary);
+}
+
+/* Status Bar */
+.status-bar {
+  background: var(--color-secondary);
+  color: white;
+  padding: var(--spacing-xs) 0;
+  text-align: center;
+  transition: all var(--transition-fast);
+}
+
+.status-bar--warning {
+  background: var(--color-warning);
+}
+
+.status-bar--error {
+  background: var(--color-error);
+}
+
+.status-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  font-size: 0.75rem;
+  font-weight: 500;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-xl);
+}
+
+.status-message--success {
+  opacity: 0.9;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .header-content {
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+
+  .brand-title {
+    font-size: 1.125rem;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .chain-indicators {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .chain-name {
+    display: none;
+  }
+
+  .connector-line {
+    width: 12px;
+  }
+
+  .status-group {
+    gap: 2px;
+  }
+
+  .status-text {
+    display: none;
+  }
+
+  .version-badge {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .header-content {
+    padding: var(--spacing-sm);
+    gap: var(--spacing-sm);
+  }
+
+  .header-brand {
+    gap: var(--spacing-sm);
+  }
+
+  .brand-title {
+    font-size: 1rem;
+  }
+
+  .logo-icon {
+    font-size: 1.25rem;
+  }
+
+  .chain-indicators {
+    padding: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
+
+  .chain-indicator {
+    padding: var(--spacing-xs);
+  }
+
+  .connector-line {
+    width: 8px;
+  }
+
+  .status-message {
+    padding: 0 var(--spacing-md);
+    font-size: 0.625rem;
+  }
+}
+
+/* Animation for connection status changes */
+.status-icon {
+  transition: all var(--transition-fast);
+}
+
+.status-icon--connected {
+  animation: connect-pulse 0.5s ease-out;
+}
+
+.status-icon--disconnected {
+  animation: disconnect-shake 0.5s ease-out;
+}
+
+@keyframes connect-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes disconnect-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+/* Dark theme enhancements */
+@media (prefers-color-scheme: dark) {
+  .header {
+    backdrop-filter: blur(10px);
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .pulse-arrow,
+  .connect-pulse,
+  .disconnect-shake {
+    animation: none;
+  }
+  
+  .logo-symbol,
+  .chain-indicator,
+  .status-icon {
+    transition: none;
+  }
+}
