@@ -4,17 +4,36 @@ const monitoringService = require('../services/monitoringService');
 const socketService = require('../services/socketService');
 const { generateTxId } = require('../utils/helpers');
 
-// Initialize Enso service
-const ensoService = new EnsoYieldFarming(
-  process.env.ENSO_API_KEY,
-  process.env.PRIVATE_KEY
-);
+// Initialize Enso service with validation
+let ensoService = null;
+
+try {
+  const apiKey = process.env.ENSO_API_KEY;
+  const privateKey = process.env.PRIVATE_KEY;
+  
+  if (!apiKey || !privateKey) {
+    logger.warn('⚠️  ENSO_API_KEY or PRIVATE_KEY not configured - farming operations will be disabled');
+  } else {
+    ensoService = new EnsoYieldFarming(apiKey, privateKey);
+    logger.info('✅ EnsoYieldFarming service initialized for farming operations');
+  }
+} catch (error) {
+  logger.error('❌ Failed to initialize EnsoYieldFarming service:', error.message);
+}
 
 /**
  * Deposit EURe for LP tokens
  */
 const deposit = async (req, res) => {
   try {
+    if (!ensoService) {
+      return res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'EnsoYieldFarming service not configured. Please check ENSO_API_KEY and PRIVATE_KEY environment variables.',
+        requestId: req.id
+      });
+    }
+
     const { amount, slippage, userAddress } = req.body;
 
     logger.info('Processing deposit request', {

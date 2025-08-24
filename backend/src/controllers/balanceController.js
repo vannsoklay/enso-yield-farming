@@ -2,17 +2,36 @@ const logger = require('../utils/logger');
 const EnsoYieldFarming = require('../services/EnsoYieldFarming');
 const socketService = require('../services/socketService');
 
-// Initialize Enso service
-const ensoService = new EnsoYieldFarming(
-  process.env.ENSO_API_KEY,
-  process.env.PRIVATE_KEY
-);
+// Initialize Enso service with validation
+let ensoService = null;
+
+try {
+  const apiKey = process.env.ENSO_API_KEY;
+  const privateKey = process.env.PRIVATE_KEY;
+  
+  if (!apiKey || !privateKey) {
+    logger.warn('⚠️  ENSO_API_KEY or PRIVATE_KEY not configured - some features will be disabled');
+  } else {
+    ensoService = new EnsoYieldFarming(apiKey, privateKey);
+    logger.info('✅ EnsoYieldFarming service initialized');
+  }
+} catch (error) {
+  logger.error('❌ Failed to initialize EnsoYieldFarming service:', error.message);
+}
 
 /**
  * Get balances for all chains or specific chain
  */
 const getBalances = async (req, res) => {
   try {
+    if (!ensoService) {
+      return res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'EnsoYieldFarming service not configured. Please check ENSO_API_KEY and PRIVATE_KEY environment variables.',
+        requestId: req.id
+      });
+    }
+
     const { userAddress, chain } = req.query;
     
     logger.info('Getting balances', {

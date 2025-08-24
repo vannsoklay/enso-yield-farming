@@ -15,8 +15,7 @@ const transactionSchema = new mongoose.Schema({
   internalId: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
 
   // User and transaction details
