@@ -6,11 +6,24 @@ const { getFarmingPair, getTokenByAddress } = require('../config/tokens');
 
 class EnsoYieldFarming {
   constructor(apiKey, privateKey) {
-    this.apiKey = apiKey;
-    this.privateKey = privateKey;
+    this.apiKey = apiKey || process.env.ENSO_API_KEY
+    this.privateKey = privateKey || process.env.PRIVATE_KEY
+    
+    // Validate required configuration
+    if (!this.apiKey) {
+      logger.warn('ENSO_API_KEY not provided - some features may not work')
+    }
+    
+    if (!this.privateKey) {
+      throw new Error('PRIVATE_KEY is required for EnsoYieldFarming service')
+    }
     
     // Initialize wallet
-    this.wallet = new ethers.Wallet(privateKey);
+    try {
+      this.wallet = new ethers.Wallet(this.privateKey)
+    } catch (error) {
+      throw new Error(`Invalid private key: ${error.message}`)
+    }
     
     // Initialize providers
     this.polygonProvider = new ethers.JsonRpcProvider(getRpcUrl(137));
