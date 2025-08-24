@@ -1,7 +1,6 @@
-// Web3Context.jsx - Enhanced Web3 integration with ethers.js + viem
+// Web3Context.jsx - Viem v2 Web3 integration
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { ethers } from 'ethers';
-import { createPublicClient, createWalletClient, http } from 'viem';
+import { createPublicClient, createWalletClient, custom, http } from 'viem';
 import { polygon, gnosis } from 'viem/chains';
 
 const Web3Context = createContext();
@@ -17,8 +16,8 @@ export const useWeb3 = () => {
 export const Web3Provider = ({ children }) => {
   const [account, setAccount] = useState(null);
   const [chainId, setChainId] = useState(null);
-  const [provider, setProvider] = useState(null);
-  const [signer, setSigner] = useState(null);
+  const [publicClient, setPublicClient] = useState(null);
+  const [walletClient, setWalletClient] = useState(null);
   const [clients, setClients] = useState({});
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -43,8 +42,9 @@ export const Web3Provider = ({ children }) => {
     if (accounts.length === 0) {
       // User disconnected
       setAccount(null);
-      setProvider(null);
-      setSigner(null);
+      setPublicClient(null);
+      setWalletClient(null);
+      setClients({});
     } else {
       setAccount(accounts[0]);
       initializeWeb3();
@@ -59,22 +59,47 @@ export const Web3Provider = ({ children }) => {
   const initializeWeb3 = async () => {
     if (typeof window.ethereum !== 'undefined') {
       try {
-        // Initialize ethers provider
-        const web3Provider = new ethers.BrowserProvider(window.ethereum);
-        const accounts = await web3Provider.listAccounts();
+        // Get accounts using viem approach
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
         
         if (accounts.length > 0) {
-          const web3Signer = await web3Provider.getSigner();
-          const address = await web3Signer.getAddress();
-          const network = await web3Provider.getNetwork();
+          const currentAccount = accounts[0];
+          const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+          const currentChainId = parseInt(chainIdHex, 16);
 
-          setProvider(web3Provider);
-          setSigner(web3Signer);
-          setAccount(address);
-          setChainId(Number(network.chainId));
+          setAccount(currentAccount);
+          setChainId(currentChainId);
+
+          // Create wallet client with browser transport
+          const currentWalletClient = createWalletClient({
+            transport: custom(window.ethereum)
+          });
+          
+          // Create public client for current chain
+          let currentPublicClient;
+          if (currentChainId === 137) {
+            currentPublicClient = createPublicClient({
+              chain: polygon,
+              transport: custom(window.ethereum)
+            });
+          } else if (currentChainId === 100) {
+            currentPublicClient = createPublicClient({
+              chain: gnosis,
+              transport: custom(window.ethereum)
+            });
+          } else {
+            // Default to polygon for unsupported chains
+            currentPublicClient = createPublicClient({
+              chain: polygon,
+              transport: http()
+            });
+          }
+
+          setWalletClient(currentWalletClient);
+          setPublicClient(currentPublicClient);
         }
 
-        // Initialize viem clients
+        // Initialize dedicated clients for each chain
         const polygonClient = createPublicClient({
           chain: polygon,
           transport: http()
@@ -173,24 +198,46 @@ export const Web3Provider = ({ children }) => {
     }
   };
 
+  const getNetwork = () => {
+    return chainId;
+  };
+
+  const getAddress = () => {
+    return account;
+  };
+
+  const switchChain = async (targetChainId) => {
+    if (targetChainId === 137) {
+      await switchToPolygon();
+    } else if (targetChainId === 100) {
+      await switchToGnosis();
+    } else {
+      throw new Error(`Unsupported chain ID: ${targetChainId}`);
+    }
+  };
+
   const disconnect = async () => {
     setAccount(null);
-    setProvider(null);
-    setSigner(null);
+    setPublicClient(null);
+    setWalletClient(null);
     setChainId(null);
+    setClients({});
   };
 
   const value = {
     account,
     chainId,
-    provider,
-    signer,
+    publicClient,
+    walletClient,
     clients,
     isConnecting,
     connectWallet,
     disconnect,
     switchToPolygon,
     switchToGnosis,
+    switchChain,
+    getNetwork,
+    getAddress,
     isConnected: !!account,
     isPolygon: chainId === 137,
     isGnosis: chainId === 100

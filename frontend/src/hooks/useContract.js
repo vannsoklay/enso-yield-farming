@@ -1,44 +1,82 @@
-// useContract.js - Custom hook for contract interactions with ethers.js + viem
-import { useEffect, useState } from 'react';
-import { ethers } from 'ethers';
+// useContract.js - Custom hook for contract interactions with viem v2
+import { useEffect, useState, useCallback } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 
 export const useContract = (address, abi, chainId) => {
-  const { provider, signer, clients, chainId: currentChainId } = useWeb3();
-  const [contract, setContract] = useState(null);
-  const [readOnlyContract, setReadOnlyContract] = useState(null);
+  const { publicClient, walletClient, clients, chainId: currentChainId } = useWeb3();
   const [isCorrectChain, setIsCorrectChain] = useState(false);
 
   useEffect(() => {
-    if (provider && signer && address && abi) {
-      try {
-        // Create contract instance with signer for write operations
-        const contractWithSigner = new ethers.Contract(address, abi, signer);
-        setContract(contractWithSigner);
+    // Check if we're on the correct chain
+    setIsCorrectChain(!chainId || currentChainId === chainId);
+  }, [chainId, currentChainId]);
 
-        // Create read-only contract instance
-        const readContract = new ethers.Contract(address, abi, provider);
-        setReadOnlyContract(readContract);
-
-        // Check if we're on the correct chain
-        setIsCorrectChain(!chainId || currentChainId === chainId);
-      } catch (error) {
-        console.error('Error creating contract:', error);
-        setContract(null);
-        setReadOnlyContract(null);
-        setIsCorrectChain(false);
-      }
-    } else {
-      setContract(null);
-      setReadOnlyContract(null);
-      setIsCorrectChain(false);
+  const readContract = useCallback(async (functionName, args = []) => {
+    if (!address || !abi || !isCorrectChain) {
+      throw new Error('Contract not available or incorrect chain');
     }
-  }, [provider, signer, address, abi, chainId, currentChainId]);
+
+    const client = chainId ? 
+      (chainId === 137 ? clients.polygon : clients.gnosis) : 
+      publicClient;
+
+    if (!client) {
+      throw new Error('Public client not available');
+    }
+
+    return await client.readContract({
+      address,
+      abi,
+      functionName,
+      args
+    });
+  }, [address, abi, chainId, isCorrectChain, clients, publicClient]);
+
+  const writeContract = useCallback(async (functionName, args = [], options = {}) => {
+    if (!address || !abi || !isCorrectChain || !walletClient) {
+      throw new Error('Contract not available, incorrect chain, or wallet not connected');
+    }
+
+    const hash = await walletClient.writeContract({
+      address,
+      abi,
+      functionName,
+      args,
+      ...options
+    });
+
+    return hash;
+  }, [address, abi, isCorrectChain, walletClient]);
+
+  const estimateGas = useCallback(async (functionName, args = [], options = {}) => {
+    if (!address || !abi || !isCorrectChain) {
+      throw new Error('Contract not available or incorrect chain');
+    }
+
+    const client = chainId ? 
+      (chainId === 137 ? clients.polygon : clients.gnosis) : 
+      publicClient;
+
+    if (!client) {
+      throw new Error('Public client not available');
+    }
+
+    return await client.estimateContractGas({
+      address,
+      abi,
+      functionName,
+      args,
+      ...options
+    });
+  }, [address, abi, chainId, isCorrectChain, clients, publicClient]);
 
   return { 
-    contract: isCorrectChain ? contract : null, 
-    readOnlyContract: isCorrectChain ? readOnlyContract : null,
-    isCorrectChain
+    readContract,
+    writeContract,
+    estimateGas,
+    isCorrectChain,
+    address,
+    abi
   };
 };
 

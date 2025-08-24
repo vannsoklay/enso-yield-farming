@@ -1,6 +1,6 @@
-// useTokenBalance.js - Enhanced balance hook with viem integration
+// useTokenBalance.js - Enhanced balance hook with viem v2 integration
 import { useEffect, useState, useCallback } from 'react';
-import { ethers } from 'ethers';
+import { formatUnits } from 'viem';
 import { useWeb3 } from '../context/Web3Context';
 
 export const useTokenBalance = (tokenAddress, chainId) => {
@@ -26,13 +26,13 @@ export const useTokenBalance = (tokenAddress, chainId) => {
       }
       
       if (tokenAddress === 'native') {
-        // Get native token balance using viem
+        // Get native token balance using viem v2
         const balance = await client.getBalance({
           address: account
         });
-        setBalance(ethers.formatEther(balance.toString()));
+        setBalance(formatUnits(balance, 18));
       } else {
-        // Get ERC20 token balance using viem
+        // Get ERC20 token balance using viem v2
         try {
           const balance = await client.readContract({
             address: tokenAddress,
@@ -48,7 +48,7 @@ export const useTokenBalance = (tokenAddress, chainId) => {
             functionName: 'balanceOf',
             args: [account]
           });
-          setBalance(ethers.formatEther(balance.toString()));
+          setBalance(formatUnits(balance, 18)); // Assuming 18 decimals, could be made configurable
         } catch (contractError) {
           // Fallback: might not be a standard ERC20 token
           console.warn('Failed to read contract balance:', contractError);

@@ -1,15 +1,16 @@
-const { ethers } = require('ethers');
+const { formatUnits, parseUnits, isAddress } = require('viem');
+const { privateKeyToAccount } = require('viem/accounts');
 
 /**
  * Format wei amount to human readable format
- * @param {string|BigNumber} amount - Amount in wei
+ * @param {string|bigint} amount - Amount in wei
  * @param {number} decimals - Token decimals (default: 18)
  * @param {number} precision - Decimal precision for display (default: 4)
  * @returns {string} Formatted amount
  */
 const formatAmount = (amount, decimals = 18, precision = 4) => {
   try {
-    const formatted = ethers.formatUnits(amount, decimals);
+    const formatted = formatUnits(BigInt(amount.toString()), decimals);
     return parseFloat(formatted).toFixed(precision);
   } catch (error) {
     return '0.0000';
@@ -20,11 +21,11 @@ const formatAmount = (amount, decimals = 18, precision = 4) => {
  * Parse human readable amount to wei
  * @param {string} amount - Human readable amount
  * @param {number} decimals - Token decimals (default: 18)
- * @returns {BigNumber} Amount in wei
+ * @returns {bigint} Amount in wei
  */
 const parseAmount = (amount, decimals = 18) => {
   try {
-    return ethers.parseUnits(amount.toString(), decimals);
+    return parseUnits(amount.toString(), decimals);
   } catch (error) {
     throw new Error(`Invalid amount: ${amount}`);
   }
@@ -37,7 +38,7 @@ const parseAmount = (amount, decimals = 18) => {
  */
 const isValidAddress = (address) => {
   try {
-    return ethers.isAddress(address);
+    return isAddress(address);
   } catch (error) {
     return false;
   }
@@ -50,7 +51,7 @@ const isValidAddress = (address) => {
  */
 const isValidPrivateKey = (privateKey) => {
   try {
-    new ethers.Wallet(privateKey);
+    privateKeyToAccount(privateKey);
     return true;
   } catch (error) {
     return false;
